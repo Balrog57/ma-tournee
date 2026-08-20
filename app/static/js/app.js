@@ -379,10 +379,12 @@
     const q = (els.search.value || "").trim();
     const path = q ? "/api/schools?q=" + encodeURIComponent(q) : "/api/schools";
     state.schools = await api(path);
-    const ids = new Set(state.schools.map(function (s) { return s.id; }));
-    state.selected.forEach(function (id) {
-      if (!ids.has(id)) state.selected.delete(id);
-    });
+    if (!q) {
+      const ids = new Set(state.schools.map(function (s) { return s.id; }));
+      state.selected.forEach(function (id) {
+        if (!ids.has(id)) state.selected.delete(id);
+      });
+    }
     renderList();
     refreshMap();
   }

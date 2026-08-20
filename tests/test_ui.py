@@ -12,6 +12,8 @@ def test_mobile_list_toggle_and_map_selection_are_wired():
     assert 'aria-controls="school-sidebar"' in html
     assert ".layout.list-collapsed" in css
     assert "normalizeSearch" in js
+    load_schools = js[js.index("async function loadSchools"):js.index("async function loadHealth")]
+    assert "if (!q)" in load_schools
     select_from_map = js[js.index("function selectSchoolFromMap"):js.index("function renderList")]
     assert "state.selected.add" not in select_from_map
     assert select_from_map.index("setListCollapsed(false)") < select_from_map.index("scrollIntoView")
