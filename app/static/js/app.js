@@ -17,6 +17,10 @@
     dialogTitle: document.getElementById("dialog-title"),
     dialogError: document.getElementById("dialog-error"),
     btnDelete: document.getElementById("btn-dialog-delete"),
+    deleteConfirm: document.getElementById("delete-confirm"),
+    deleteConfirmName: document.getElementById("delete-confirm-name"),
+    btnDeleteYes: document.getElementById("btn-delete-yes"),
+    btnDeleteNo: document.getElementById("btn-delete-no"),
     tourPanel: document.getElementById("tour-panel"),
     tourSummary: document.getElementById("tour-summary"),
     tourStops: document.getElementById("tour-stops"),
@@ -378,8 +382,21 @@
     }
   }
 
+  function hideDeleteConfirm() {
+    if (els.deleteConfirm) els.deleteConfirm.classList.add("hidden");
+    if (els.deleteConfirmName) els.deleteConfirmName.textContent = "";
+  }
+
+  function showDeleteConfirm() {
+    const name = (els.form.name.value || "").trim() || "cette école";
+    els.deleteConfirmName.textContent = name;
+    els.deleteConfirm.classList.remove("hidden");
+    els.dialogError.textContent = "";
+  }
+
   function openSchoolDialog(school) {
     els.dialogError.textContent = "";
+    hideDeleteConfirm();
     els.form.reset();
     if (school) {
       els.dialogTitle.textContent = "Modifier l'école";
@@ -435,6 +452,7 @@
   });
 
   document.getElementById("btn-dialog-cancel").addEventListener("click", function () {
+    hideDeleteConfirm();
     els.dialog.close();
   });
 
@@ -490,13 +508,23 @@
     }
   });
 
-  els.btnDelete.addEventListener("click", async function () {
+  els.btnDelete.addEventListener("click", function () {
     const id = els.form.id.value;
     if (!id) return;
-    if (!window.confirm("Supprimer cette école ?")) return;
+    showDeleteConfirm();
+  });
+
+  els.btnDeleteNo.addEventListener("click", function () {
+    hideDeleteConfirm();
+  });
+
+  els.btnDeleteYes.addEventListener("click", async function () {
+    const id = els.form.id.value;
+    if (!id) return;
     try {
       await api("/api/schools/" + id, { method: "DELETE" });
       state.selected.delete(Number(id));
+      hideDeleteConfirm();
       els.dialog.close();
       await loadSchools();
       setStatus("École supprimée");

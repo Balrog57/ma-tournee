@@ -108,6 +108,15 @@
         <button type="button" id="btn-dialog-cancel" class="btn ghost">Annuler</button>
         <button type="button" id="btn-dialog-delete" class="btn danger hidden">Supprimer</button>
       </div>
+      <div id="delete-confirm" class="delete-confirm hidden" role="alertdialog" aria-labelledby="delete-confirm-title">
+        <p id="delete-confirm-title" class="delete-confirm-title">Supprimer cette école ?</p>
+        <p id="delete-confirm-name" class="delete-confirm-name"></p>
+        <p class="hint">Cette action est définitive.</p>
+        <div class="actions-row">
+          <button type="button" id="btn-delete-yes" class="btn danger">Oui, supprimer</button>
+          <button type="button" id="btn-delete-no" class="btn ghost">Non, annuler</button>
+        </div>
+      </div>
       <p id="dialog-error" class="warn"></p>
     </form>
   </dialog>
