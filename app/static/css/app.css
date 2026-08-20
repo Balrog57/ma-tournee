@@ -679,7 +679,8 @@ dialog::backdrop { background: rgba(40, 16, 22, 0.4); }
 
 @media (max-width: 900px) {
   body {
-    height: 100dvh;
+    height: 100svh;
+    min-height: 100svh;
     overflow: hidden;
   }
 
@@ -705,6 +706,11 @@ dialog::backdrop { background: rgba(40, 16, 22, 0.4); }
     overflow: hidden;
   }
 
+  .list-controls {
+    position: static;
+    flex-shrink: 0;
+  }
+
   .school-list {
     min-height: 140px;
     max-height: none;
@@ -725,9 +731,10 @@ dialog::backdrop { background: rgba(40, 16, 22, 0.4); }
     left: 0.5rem;
     right: 0.5rem;
     top: auto;
-    bottom: 0.5rem;
+    bottom: calc(0.5rem + env(safe-area-inset-bottom));
     width: auto;
-    max-height: 40%;
+    max-height: calc(100% - 1rem - env(safe-area-inset-bottom));
+    padding-bottom: max(0.7rem, env(safe-area-inset-bottom));
   }
 
   .topbar {
