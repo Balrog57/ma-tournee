@@ -32,6 +32,7 @@ class SchoolBase(BaseModel):
 class SchoolCreate(SchoolBase):
     lat: Optional[float] = Field(None, ge=-90, le=90)
     lon: Optional[float] = Field(None, ge=-180, le=180)
+    favorite: bool = False
 
 
 class SchoolUpdate(BaseModel):
@@ -41,6 +42,7 @@ class SchoolUpdate(BaseModel):
     lat: Optional[float] = Field(None, ge=-90, le=90)
     lon: Optional[float] = Field(None, ge=-180, le=180)
     clear_coords: bool = False
+    favorite: Optional[bool] = None
 
     @field_validator("name", "address", "phone", mode="before")
     @classmethod
@@ -57,6 +59,8 @@ class SchoolOut(SchoolBase):
     id: int
     lat: Optional[float] = None
     lon: Optional[float] = None
+    city: str = ""
+    favorite: bool = False
     geocode_status: GeocodeStatus = "pending"
     geocode_error: Optional[str] = None
     updated_at: str

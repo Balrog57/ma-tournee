@@ -11,33 +11,41 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <img class="brand-logo" src="/static/img/logo-ma-tournee.png" alt="Ma Tournée" width="48" height="48">
+      <img class="brand-logo" src="/static/img/logo-ma-tournee.png" alt="L'Evasion" width="72" height="72">
       <div class="brand-text">
         <strong>L'Evasion</strong>
-        <span>Ma Tournée — écoles</span>
-        <a class="site-link" href="https://evasion57.fr/" target="_blank" rel="noopener noreferrer">evasion57.fr</a>
+        <span class="brand-tagline">Librairie — papeterie — cadeaux</span>
+        <span class="brand-address">24, rue de la République, 57320 Bouzonville</span>
+        <div class="brand-contacts">
+          <button type="button" class="copy-phone" id="btn-copy-phone" data-phone="03 87 57 96 50" title="Cliquer pour copier le numéro">
+            Tél. 03 87 57 96 50
+          </button>
+          <a class="mail-link" href="mailto:librairie.evasion@orange.fr">librairie.evasion@orange.fr</a>
+          <a class="site-link" href="https://evasion57.fr/" target="_blank" rel="noopener noreferrer">evasion57.fr</a>
+        </div>
       </div>
     </div>
     <div class="topbar-actions">
-      <div id="status-bar" class="status-bar" aria-live="polite"></div>
       <button type="button" id="btn-logout" class="btn ghost">Déconnexion</button>
     </div>
   </header>
 
   <main class="layout">
     <section class="panel list-panel">
-      <div class="toolbar">
-        <input type="search" id="search" placeholder="Rechercher une école…" autocomplete="off">
-        <button type="button" id="btn-select-visible" class="btn ghost">Tout visible</button>
-        <button type="button" id="btn-clear-selection" class="btn ghost">Aucun</button>
-      </div>
-
-      <div class="actions-row">
-        <button type="button" id="btn-new" class="btn">Ajouter</button>
-        <label class="btn ghost file-btn">Importer CSV
-          <input type="file" id="import-file" accept=".csv,text/csv" hidden>
-        </label>
-        <a class="btn ghost" id="btn-export" href="/api/export/schools.csv">Exporter</a>
+      <div class="list-controls">
+        <input type="search" id="search" placeholder="Rechercher une école ou une ville…" autocomplete="off">
+        <div class="selection-row">
+          <button type="button" id="btn-select-visible" class="btn ghost">Tout visible</button>
+          <button type="button" id="btn-clear-selection" class="btn ghost">Aucun</button>
+          <p id="selection-count" class="selection-count hint">Aucune école sélectionnée</p>
+        </div>
+        <div class="actions-row">
+          <button type="button" id="btn-new" class="btn primary">Ajouter</button>
+          <label class="btn ghost file-btn">Importer
+            <input type="file" id="import-file" accept=".csv,text/csv" hidden>
+          </label>
+          <a class="btn ghost" id="btn-export" href="/api/export/schools.csv">Exporter</a>
+        </div>
       </div>
 
       <div id="school-list" class="school-list" role="list"></div>
@@ -51,7 +59,7 @@
       </div>
 
       <details class="depot-box">
-        <summary>Dépôt — L'Evasion</summary>
+        <summary id="depot-summary">Dépôt</summary>
         <form id="depot-form" class="form">
           <label>Nom <input name="name" required maxlength="200"></label>
           <label>Adresse <input name="address" required maxlength="500"></label>
@@ -61,7 +69,7 @@
           </div>
           <div class="actions-row">
             <button type="submit" class="btn">Enregistrer</button>
-            <button type="button" id="btn-geocode-depot" class="btn ghost">Géocoder</button>
+            <button type="button" id="btn-geocode-depot" class="btn ghost" title="Localise le dépôt et centre la carte dessus">Localiser sur la carte</button>
           </div>
           <p id="depot-status" class="hint"></p>
         </form>
@@ -79,6 +87,8 @@
     </section>
   </main>
 
+  <div id="status-bar" class="status-toast" aria-live="polite"></div>
+
   <dialog id="school-dialog">
     <form id="school-form" method="dialog" class="form">
       <h2 id="dialog-title">École</h2>
@@ -90,7 +100,7 @@
         <label>Lat <input name="lat" type="number" step="any" placeholder="auto"></label>
         <label>Lon <input name="lon" type="number" step="any" placeholder="auto"></label>
       </div>
-      <p class="hint">Laissez lat/lon vides pour géocoder l'adresse. Saisissez-les manuellement si l'adresse est introuvable.</p>
+      <p class="hint">Laissez lat/lon vides pour localiser automatiquement l'adresse sur la carte. Remplissez-les seulement si la localisation automatique échoue.</p>
       <div class="actions-row">
         <button type="submit" class="btn primary" value="save">Enregistrer</button>
         <button type="button" id="btn-dialog-cancel" class="btn ghost">Annuler</button>

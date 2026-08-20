@@ -24,6 +24,7 @@ router = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
 
 
 def _row_to_school(row) -> SchoolOut:
+    keys = row.keys()
     return SchoolOut(
         id=row["id"],
         name=row["name"],
@@ -31,6 +32,8 @@ def _row_to_school(row) -> SchoolOut:
         phone=row["phone"],
         lat=row["lat"],
         lon=row["lon"],
+        city=(row["city"] if "city" in keys else "") or "",
+        favorite=bool(row["favorite"]) if "favorite" in keys else False,
         geocode_status=row["geocode_status"],
         geocode_error=row["geocode_error"],
         updated_at=row["updated_at"],
@@ -66,13 +69,16 @@ def export_schools_csv(db: Database = Depends(get_db)) -> Response:
     rows = db.list_schools()
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";", lineterminator="\n")
-    writer.writerow(["nom", "adresse", "telephone", "lat", "lon"])
+    writer.writerow(["nom", "adresse", "telephone", "ville", "favori", "lat", "lon"])
     for row in rows:
+        keys = row.keys()
         writer.writerow(
             [
                 row["name"],
                 row["address"],
                 row["phone"] or "",
+                (row["city"] if "city" in keys else "") or "",
+                "1" if ("favorite" in keys and row["favorite"]) else "0",
                 "" if row["lat"] is None else row["lat"],
                 "" if row["lon"] is None else row["lon"],
             ]
@@ -113,6 +119,7 @@ async def create_school(
         lon=lon,
         geocode_status=status,
         geocode_error=error,
+        favorite=payload.favorite,
     )
     row = db.get_school(school_id)
     assert row is not None
@@ -135,6 +142,8 @@ async def update_school(
     for key in ("name", "address", "phone"):
         if key in data:
             fields[key] = data[key]
+    if "favorite" in data:
+        fields["favorite"] = bool(data["favorite"])
 
     address_changed = "address" in data and data["address"] != existing["address"]
     manual_coords = payload.lat is not None and payload.lon is not None

@@ -23,7 +23,10 @@
     tourWarnings: document.getElementById("tour-warnings"),
     depotForm: document.getElementById("depot-form"),
     depotStatus: document.getElementById("depot-status"),
+    depotSummary: document.getElementById("depot-summary"),
   };
+
+  let statusTimer = null;
 
   function escapeHtml(value) {
     return TourMap.escapeHtml(value);
@@ -73,18 +76,55 @@
   }
 
   function setStatus(message, isError) {
+    clearTimeout(statusTimer);
+    if (!els.status) return;
     els.status.textContent = message || "";
-    els.status.style.color = isError ? "#9b1c1c" : "";
+    els.status.classList.toggle("is-error", !!isError);
+    els.status.classList.toggle("visible", !!message);
+    if (message) {
+      statusTimer = setTimeout(function () {
+        els.status.classList.remove("visible");
+      }, isError ? 6000 : 3500);
+    }
+  }
+
+  function updateDepotSummary() {
+    if (!els.depotSummary) return;
+    const name = (els.depotForm.name.value || "").trim();
+    els.depotSummary.textContent = name ? "Dépôt — " + name : "Dépôt";
   }
 
   function statusLabel(school) {
     const map = {
-      ok: "OK",
-      pending: "En attente",
-      failed: "Introuvable",
-      manual: "Manuel",
+      ok: "Sur la carte",
+      pending: "À localiser",
+      failed: "Pas sur la carte",
+      manual: "Position manuelle",
     };
     return map[school.geocode_status] || school.geocode_status;
+  }
+
+  function statusTitle(school) {
+    const map = {
+      ok: "Cette école apparaît déjà sur la carte.",
+      pending: "L'adresse n'a pas encore été localisée.",
+      failed: "L'adresse n'a pas pu être trouvée automatiquement.",
+      manual: "Les coordonnées ont été saisies à la main (sans recherche automatique).",
+    };
+    return map[school.geocode_status] || "";
+  }
+
+  function updateSelectionCount() {
+    const el = document.getElementById("selection-count");
+    if (!el) return;
+    const n = state.selected.size;
+    el.textContent =
+      n === 0
+        ? "Aucune école sélectionnée pour la tournée"
+        : n === 1
+          ? "1 école sélectionnée pour la tournée"
+          : n + " écoles sélectionnées pour la tournée";
+    el.classList.toggle("has-selection", n > 0);
   }
 
   function visibleSchools() {
@@ -94,14 +134,37 @@
       return (
         (s.name || "").toLowerCase().indexOf(q) !== -1 ||
         (s.address || "").toLowerCase().indexOf(q) !== -1 ||
+        (s.city || "").toLowerCase().indexOf(q) !== -1 ||
         (s.phone || "").toLowerCase().indexOf(q) !== -1
       );
     });
   }
 
+  function selectSchoolFromMap(schoolId) {
+    state.selected.add(schoolId);
+    renderList();
+    refreshMap();
+    updateSelectionCount();
+    const row = els.list.querySelector('[data-school-id="' + schoolId + '"]');
+    if (row) {
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      row.classList.add("flash");
+      setTimeout(function () {
+        row.classList.remove("flash");
+      }, 1200);
+    }
+    const school = state.schools.find(function (s) {
+      return s.id === schoolId;
+    });
+    if (school) {
+      TourMap.focusSchool(school);
+    }
+  }
+
   function renderList() {
     const schools = visibleSchools();
     els.list.innerHTML = "";
+    updateSelectionCount();
     if (!schools.length) {
       const empty = document.createElement("p");
       empty.className = "hint";
@@ -110,18 +173,65 @@
       els.list.appendChild(empty);
       return;
     }
+
+    let lastCity = null;
+    let inFavorites = null;
     schools.forEach(function (school) {
+      const isFav = !!school.favorite;
+      if (isFav !== inFavorites) {
+        inFavorites = isFav;
+        lastCity = null;
+        if (isFav) {
+          const favHeader = document.createElement("div");
+          favHeader.className = "city-header favorites-header";
+          favHeader.textContent = "Favoris";
+          els.list.appendChild(favHeader);
+        }
+      }
+      const city = (school.city || "Autre").trim() || "Autre";
+      if (city !== lastCity) {
+        lastCity = city;
+        const header = document.createElement("div");
+        header.className = "city-header";
+        header.textContent = city;
+        els.list.appendChild(header);
+      }
+
       const item = document.createElement("div");
-      item.className = "school-item";
+      item.className = "school-item" + (state.selected.has(school.id) ? " selected" : "");
+      item.dataset.schoolId = String(school.id);
       item.setAttribute("role", "listitem");
 
       const check = document.createElement("input");
       check.type = "checkbox";
+      check.className = "school-check";
+      check.title = "Inclure dans la tournée";
       check.checked = state.selected.has(school.id);
       check.addEventListener("change", function () {
         if (check.checked) state.selected.add(school.id);
         else state.selected.delete(school.id);
+        item.classList.toggle("selected", check.checked);
         refreshMap();
+        updateSelectionCount();
+      });
+
+      const star = document.createElement("button");
+      star.type = "button";
+      star.className = "star-btn" + (school.favorite ? " active" : "");
+      star.title = school.favorite ? "Retirer des favoris" : "Ajouter aux favoris";
+      star.setAttribute("aria-label", star.title);
+      star.textContent = school.favorite ? "★" : "☆";
+      star.addEventListener("click", async function (event) {
+        event.stopPropagation();
+        try {
+          await api("/api/schools/" + school.id, {
+            method: "PUT",
+            body: JSON.stringify({ favorite: !school.favorite }),
+          });
+          await loadSchools();
+        } catch (err) {
+          setStatus(err.message, true);
+        }
       });
 
       const meta = document.createElement("div");
@@ -140,7 +250,7 @@
         phone.textContent = school.phone;
         meta.appendChild(phone);
       }
-      if (school.geocode_error) {
+      if (school.geocode_error && school.geocode_status === "failed") {
         const err = document.createElement("p");
         err.className = "warn";
         err.textContent = school.geocode_error;
@@ -149,37 +259,64 @@
 
       const side = document.createElement("div");
       side.className = "item-actions";
-      const badge = document.createElement("span");
-      badge.className = "badge " + school.geocode_status;
-      badge.textContent = statusLabel(school);
+
+      if (school.geocode_status !== "ok") {
+        const badge = document.createElement("span");
+        badge.className = "badge " + school.geocode_status;
+        badge.textContent = statusLabel(school);
+        badge.title = statusTitle(school);
+        side.appendChild(badge);
+      }
+
       const editBtn = document.createElement("button");
       editBtn.type = "button";
       editBtn.className = "btn ghost";
       editBtn.textContent = "Modifier";
-      editBtn.addEventListener("click", function () {
+      editBtn.addEventListener("click", function (event) {
+        event.stopPropagation();
         openSchoolDialog(school);
       });
-      const geoBtn = document.createElement("button");
-      geoBtn.type = "button";
-      geoBtn.className = "btn ghost";
-      geoBtn.textContent = "Géocoder";
-      geoBtn.addEventListener("click", async function () {
-        try {
-          setStatus("Géocodage…");
-          await api("/api/schools/" + school.id + "/geocode", { method: "POST" });
-          await loadSchools();
-          setStatus("Géocodage terminé");
-        } catch (err) {
-          setStatus(err.message, true);
-        }
-      });
-      side.appendChild(badge);
       side.appendChild(editBtn);
-      side.appendChild(geoBtn);
+
+      if (school.geocode_status === "failed" || school.geocode_status === "pending") {
+        const geoBtn = document.createElement("button");
+        geoBtn.type = "button";
+        geoBtn.className = "btn ghost";
+        geoBtn.textContent = "Localiser";
+        geoBtn.title =
+          "Cherche automatiquement la position de l'adresse pour l'afficher sur la carte";
+        geoBtn.addEventListener("click", async function (event) {
+          event.stopPropagation();
+          try {
+            setStatus("Localisation de l'adresse…");
+            await api("/api/schools/" + school.id + "/geocode", { method: "POST" });
+            await loadSchools();
+            setStatus("Position trouvée");
+          } catch (err) {
+            setStatus(err.message, true);
+          }
+        });
+        side.appendChild(geoBtn);
+      }
 
       item.appendChild(check);
+      item.appendChild(star);
       item.appendChild(meta);
       item.appendChild(side);
+
+      item.addEventListener("click", function (event) {
+        if (
+          event.target === check ||
+          event.target === star ||
+          event.target.closest("button") ||
+          event.target.closest(".badge")
+        ) {
+          return;
+        }
+        check.checked = !check.checked;
+        check.dispatchEvent(new Event("change"));
+      });
+
       els.list.appendChild(item);
     });
   }
@@ -191,7 +328,7 @@
 
   async function loadConfig() {
     state.config = await api("/api/config");
-    TourMap.init(state.config);
+    TourMap.init(state.config, { onSchoolClick: selectSchoolFromMap });
   }
 
   async function loadDepot() {
@@ -201,9 +338,15 @@
     form.address.value = state.depot.address || "";
     form.lat.value = state.depot.lat != null ? state.depot.lat : "";
     form.lon.value = state.depot.lon != null ? state.depot.lon : "";
+    updateDepotSummary();
     els.depotStatus.textContent =
-      "Statut: " +
-      (state.depot.geocode_status || "?") +
+      (state.depot.geocode_status === "ok"
+        ? "Dépôt localisé sur la carte"
+        : state.depot.geocode_status === "manual"
+          ? "Position du dépôt réglée à la main"
+          : state.depot.geocode_status === "failed"
+            ? "Adresse du dépôt non trouvée"
+            : "Dépôt à localiser") +
       (state.depot.geocode_error ? " — " + state.depot.geocode_error : "");
   }
 
@@ -304,6 +447,7 @@
     refreshMap();
     TourMap.clearRoute();
     els.tourPanel.classList.add("hidden");
+    updateSelectionCount();
   });
 
   let searchTimer = null;
@@ -407,6 +551,8 @@
     }
   });
 
+  els.depotForm.name.addEventListener("input", updateDepotSummary);
+
   els.depotForm.addEventListener("submit", async function (event) {
     event.preventDefault();
     const payload = {
@@ -434,12 +580,39 @@
 
   document.getElementById("btn-geocode-depot").addEventListener("click", async function () {
     try {
+      setStatus("Localisation du dépôt…");
       state.depot = await api("/api/settings/depot/geocode", { method: "POST" });
       await loadDepot();
       refreshMap();
-      setStatus("Dépôt géocodé");
+      TourMap.focusDepot(state.depot);
+      setStatus("Dépôt localisé sur la carte");
     } catch (err) {
       setStatus(err.message, true);
+    }
+  });
+
+  document.getElementById("btn-copy-phone").addEventListener("click", async function () {
+    const btn = document.getElementById("btn-copy-phone");
+    const phone = (btn.getAttribute("data-phone") || btn.textContent || "").trim();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(phone);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = phone;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      btn.classList.add("copied");
+      btn.textContent = "Copié !";
+      setTimeout(function () {
+        btn.classList.remove("copied");
+        btn.textContent = "Tél. " + phone;
+      }, 1600);
+    } catch (e) {
+      setStatus("Impossible de copier le numéro", true);
     }
   });
 

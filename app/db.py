@@ -9,6 +9,7 @@ from typing import Any, Iterator, Optional
 
 from app.config import Settings, get_settings
 from app.models import utc_now_iso
+from app.services.city import extract_city
 
 _write_lock = threading.Lock()
 
@@ -62,6 +63,8 @@ class Database:
                     phone TEXT,
                     lat REAL,
                     lon REAL,
+                    city TEXT NOT NULL DEFAULT '',
+                    favorite INTEGER NOT NULL DEFAULT 0,
                     geocode_status TEXT NOT NULL DEFAULT 'pending',
                     geocode_error TEXT,
                     updated_at TEXT NOT NULL
@@ -79,6 +82,26 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
                 """
             )
+            self._migrate_schools(conn)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_schools_city ON schools(city)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_schools_favorite ON schools(favorite)"
+            )
+
+    def _migrate_schools(self, conn: sqlite3.Connection) -> None:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(schools)").fetchall()}
+        if "city" not in cols:
+            conn.execute("ALTER TABLE schools ADD COLUMN city TEXT NOT NULL DEFAULT ''")
+        if "favorite" not in cols:
+            conn.execute("ALTER TABLE schools ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0")
+        # Remplir city manquante
+        rows = conn.execute(
+            "SELECT id, address, city FROM schools WHERE city IS NULL OR trim(city) = ''"
+        ).fetchall()
+        for row in rows:
+            city = extract_city(row["address"] or "")
+            if city:
+                conn.execute("UPDATE schools SET city = ? WHERE id = ?", (city, row["id"]))
 
     def _ensure_depot(self) -> None:
         with self.write() as conn:
@@ -114,18 +137,20 @@ class Database:
             )
 
     def list_schools(self, q: Optional[str] = None) -> list[sqlite3.Row]:
+        order = "favorite DESC, city COLLATE NOCASE, name COLLATE NOCASE"
         with self.read() as conn:
             if q:
                 like = f"%{q.strip()}%"
                 return conn.execute(
-                    """
+                    f"""
                     SELECT * FROM schools
                     WHERE name LIKE ? OR address LIKE ? OR IFNULL(phone, '') LIKE ?
-                    ORDER BY name COLLATE NOCASE
+                       OR IFNULL(city, '') LIKE ?
+                    ORDER BY {order}
                     """,
-                    (like, like, like),
+                    (like, like, like, like),
                 ).fetchall()
-            return conn.execute("SELECT * FROM schools ORDER BY name COLLATE NOCASE").fetchall()
+            return conn.execute(f"SELECT * FROM schools ORDER BY {order}").fetchall()
 
     def get_school(self, school_id: int) -> Optional[sqlite3.Row]:
         with self.read() as conn:
@@ -153,21 +178,42 @@ class Database:
         lon: Optional[float],
         geocode_status: str,
         geocode_error: Optional[str],
+        favorite: bool = False,
+        city: Optional[str] = None,
     ) -> int:
         now = utc_now_iso()
+        city_value = (city if city is not None else extract_city(address)).strip()
         with self.write() as conn:
             cur = conn.execute(
                 """
-                INSERT INTO schools(name, address, phone, lat, lon, geocode_status, geocode_error, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO schools(
+                    name, address, phone, lat, lon, city, favorite,
+                    geocode_status, geocode_error, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (name, address, phone, lat, lon, geocode_status, geocode_error, now),
+                (
+                    name,
+                    address,
+                    phone,
+                    lat,
+                    lon,
+                    city_value,
+                    1 if favorite else 0,
+                    geocode_status,
+                    geocode_error,
+                    now,
+                ),
             )
             return int(cur.lastrowid)
 
     def update_school(self, school_id: int, fields: dict[str, Any]) -> bool:
         if not fields:
             return self.get_school(school_id) is not None
+        if "favorite" in fields:
+            fields["favorite"] = 1 if fields["favorite"] else 0
+        if "address" in fields and "city" not in fields:
+            fields["city"] = extract_city(fields["address"] or "")
         fields = {**fields, "updated_at": utc_now_iso()}
         cols = ", ".join(f"{k} = ?" for k in fields)
         values = list(fields.values()) + [school_id]
