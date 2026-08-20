@@ -9,7 +9,9 @@
   };
 
   const els = {
+    layout: document.querySelector(".layout"),
     list: document.getElementById("school-list"),
+    btnToggleList: document.getElementById("btn-toggle-list"),
     search: document.getElementById("search"),
     status: document.getElementById("status-bar"),
     dialog: document.getElementById("school-dialog"),
@@ -147,19 +149,30 @@
     });
   }
 
+  function setListCollapsed(collapsed) {
+    els.layout.classList.toggle("list-collapsed", collapsed);
+    els.btnToggleList.setAttribute("aria-expanded", String(!collapsed));
+    els.btnToggleList.textContent = collapsed ? "☰ Liste" : "× Liste";
+    requestAnimationFrame(function () {
+      window.dispatchEvent(new Event("resize"));
+    });
+  }
+
   function selectSchoolFromMap(schoolId) {
+    setListCollapsed(false);
     state.selected.add(schoolId);
     renderList();
     refreshMap();
     updateSelectionCount();
-    const row = els.list.querySelector('[data-school-id="' + schoolId + '"]');
-    if (row) {
+    requestAnimationFrame(function () {
+      const row = els.list.querySelector('[data-school-id="' + schoolId + '"]');
+      if (!row) return;
       row.scrollIntoView({ behavior: "smooth", block: "center" });
       row.classList.add("flash");
       setTimeout(function () {
         row.classList.remove("flash");
       }, 1200);
-    }
+    });
     const school = state.schools.find(function (s) {
       return s.id === schoolId;
     });
@@ -447,6 +460,10 @@
   }
 
   // Events
+  els.btnToggleList.addEventListener("click", function () {
+    setListCollapsed(!els.layout.classList.contains("list-collapsed"));
+  });
+
   document.getElementById("btn-new").addEventListener("click", function () {
     openSchoolDialog(null);
   });
