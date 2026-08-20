@@ -1,0 +1,40 @@
+name: ma-tournee
+
+services:
+  app:
+    image: 127.0.0.1:5500/ma-tournee:latest
+    container_name: matournee-app
+    restart: unless-stopped
+    ports:
+      - "8088:8080"
+    env_file:
+      - /DATA/AppData/ma-tournee/.env
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - /DATA/AppData/ma-tournee/data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+x-casaos:
+  author: self
+  category: Utilities
+  hostname: 192.168.1.98
+  icon: http://192.168.1.98:8088/static/img/logo-ma-tournee.png
+  index: /
+  is_uncontrolled: false
+  main: app
+  port_map: "8088"
+  scheme: http
+  store_app_id: ma-tournee
+  title:
+    custom: "Ma Tournée"
+    en_us: "Ma Tournée"
+  tip: "Planification de tournées — L'Evasion"
+  description:
+    en_us: School delivery route planner for L'Evasion bookstore
+    custom: Planification de tournées scolaires pour la librairie L'Evasion

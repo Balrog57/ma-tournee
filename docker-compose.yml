@@ -1,0 +1,64 @@
+services:
+  app:
+    build: .
+    container_name: matournee-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8088}:8080"
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /data
+      GEOCODER_URL: ${GEOCODER_URL:-http://nominatim:8080}
+      ROUTER_URL: ${ROUTER_URL:-http://osrm:5000}
+      AUTH_USER: ${AUTH_USER:-}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-}
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+  osrm:
+    profiles: ["carto"]
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    container_name: matournee-osrm
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld /data/region.osrm
+    volumes:
+      - ./osm-data:/data
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "osrm-routed", "--help"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  nominatim:
+    profiles: ["carto"]
+    image: mediagis/nominatim:4.4
+    container_name: matournee-nominatim
+    restart: unless-stopped
+    environment:
+      PBF_PATH: /nominatim/data/region.osm.pbf
+      REPLICATION_URL: ""
+      IMPORT_WIKIPEDIA: "false"
+      IMPORT_STYLE: address
+      NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:-matournee_local_only}
+    volumes:
+      - ./osm-data/region.osm.pbf:/nominatim/data/region.osm.pbf:ro
+      - ./nominatim-data:/var/lib/postgresql/14/main
+    expose:
+      - "8080"
+    shm_size: "1gb"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8080/status || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 10
+      start_period: 300s

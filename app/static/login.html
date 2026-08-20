@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Connexion — Ma Tournée</title>
+  <link rel="icon" href="/static/img/logo-ma-tournee.png" type="image/png">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="login-page">
+  <main class="login-card">
+    <div class="login-logo-wrap">
+      <img
+        class="login-logo"
+        src="/static/img/logo-ma-tournee.png"
+        alt="Ma Tournée"
+        width="220"
+        height="220"
+      >
+    </div>
+    <h1>Connexion</h1>
+    <p class="hint">Saisissez vos identifiants pour accéder à la planification des tournées.</p>
+    <form id="login-form" class="form" autocomplete="on">
+      <label>Compte
+        <input name="username" type="text" required maxlength="100" autocomplete="username" autocapitalize="none" spellcheck="false">
+      </label>
+      <label>Mot de passe
+        <input name="password" type="password" required maxlength="200" autocomplete="current-password">
+      </label>
+      <button type="submit" class="btn primary login-submit">Se connecter</button>
+      <p id="login-error" class="warn" role="alert"></p>
+    </form>
+  </main>
+  <script>
+    (function () {
+      var form = document.getElementById("login-form");
+      var error = document.getElementById("login-error");
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        error.textContent = "";
+        try {
+          var response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({
+              username: form.username.value.trim(),
+              password: form.password.value,
+            }),
+          });
+          var data = {};
+          try { data = await response.json(); } catch (e) {}
+          if (!response.ok) {
+            error.textContent = (data && data.detail) || "Connexion impossible";
+            return;
+          }
+          window.location.href = "/";
+        } catch (err) {
+          error.textContent = "Erreur réseau";
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

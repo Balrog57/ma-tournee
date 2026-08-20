@@ -1,0 +1,212 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+import threading
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Iterator, Optional
+
+from app.config import Settings, get_settings
+from app.models import utc_now_iso
+
+_write_lock = threading.Lock()
+
+
+class Database:
+    def __init__(self, settings: Optional[Settings] = None) -> None:
+        self.settings = settings or get_settings()
+        self.path = Path(self.settings.data_dir) / "tournee.db"
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_schema()
+        self._ensure_depot()
+
+    def connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.path, check_same_thread=False, timeout=30)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA busy_timeout = 5000")
+        return conn
+
+    @contextmanager
+    def write(self) -> Iterator[sqlite3.Connection]:
+        with _write_lock:
+            conn = self.connect()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
+    @contextmanager
+    def read(self) -> Iterator[sqlite3.Connection]:
+        conn = self.connect()
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+    def _init_schema(self) -> None:
+        with self.write() as conn:
+            conn.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS schools (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    address TEXT NOT NULL,
+                    phone TEXT,
+                    lat REAL,
+                    lon REAL,
+                    geocode_status TEXT NOT NULL DEFAULT 'pending',
+                    geocode_error TEXT,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_schools_name ON schools(name);
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS sessions (
+                    token TEXT PRIMARY KEY,
+                    username TEXT NOT NULL,
+                    expires_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+                """
+            )
+
+    def _ensure_depot(self) -> None:
+        with self.write() as conn:
+            row = conn.execute("SELECT value FROM settings WHERE key = 'depot'").fetchone()
+            if row:
+                return
+            depot = {
+                "name": self.settings.depot_name,
+                "address": self.settings.depot_address,
+                "lat": None,
+                "lon": None,
+                "geocode_status": "pending",
+                "geocode_error": None,
+            }
+            conn.execute(
+                "INSERT INTO settings(key, value) VALUES (?, ?)",
+                ("depot", json.dumps(depot, ensure_ascii=False)),
+            )
+
+    def get_setting(self, key: str) -> Optional[dict[str, Any]]:
+        with self.read() as conn:
+            row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+            if not row:
+                return None
+            return json.loads(row["value"])
+
+    def set_setting(self, key: str, value: dict[str, Any]) -> None:
+        with self.write() as conn:
+            conn.execute(
+                "INSERT INTO settings(key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, json.dumps(value, ensure_ascii=False)),
+            )
+
+    def list_schools(self, q: Optional[str] = None) -> list[sqlite3.Row]:
+        with self.read() as conn:
+            if q:
+                like = f"%{q.strip()}%"
+                return conn.execute(
+                    """
+                    SELECT * FROM schools
+                    WHERE name LIKE ? OR address LIKE ? OR IFNULL(phone, '') LIKE ?
+                    ORDER BY name COLLATE NOCASE
+                    """,
+                    (like, like, like),
+                ).fetchall()
+            return conn.execute("SELECT * FROM schools ORDER BY name COLLATE NOCASE").fetchall()
+
+    def get_school(self, school_id: int) -> Optional[sqlite3.Row]:
+        with self.read() as conn:
+            return conn.execute("SELECT * FROM schools WHERE id = ?", (school_id,)).fetchone()
+
+    def get_schools_by_ids(self, ids: list[int]) -> list[sqlite3.Row]:
+        if not ids:
+            return []
+        placeholders = ",".join("?" for _ in ids)
+        with self.read() as conn:
+            rows = conn.execute(
+                f"SELECT * FROM schools WHERE id IN ({placeholders})",
+                ids,
+            ).fetchall()
+        by_id = {row["id"]: row for row in rows}
+        return [by_id[i] for i in ids if i in by_id]
+
+    def insert_school(
+        self,
+        *,
+        name: str,
+        address: str,
+        phone: Optional[str],
+        lat: Optional[float],
+        lon: Optional[float],
+        geocode_status: str,
+        geocode_error: Optional[str],
+    ) -> int:
+        now = utc_now_iso()
+        with self.write() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO schools(name, address, phone, lat, lon, geocode_status, geocode_error, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (name, address, phone, lat, lon, geocode_status, geocode_error, now),
+            )
+            return int(cur.lastrowid)
+
+    def update_school(self, school_id: int, fields: dict[str, Any]) -> bool:
+        if not fields:
+            return self.get_school(school_id) is not None
+        fields = {**fields, "updated_at": utc_now_iso()}
+        cols = ", ".join(f"{k} = ?" for k in fields)
+        values = list(fields.values()) + [school_id]
+        with self.write() as conn:
+            cur = conn.execute(f"UPDATE schools SET {cols} WHERE id = ?", values)
+            return cur.rowcount > 0
+
+    def delete_school(self, school_id: int) -> bool:
+        with self.write() as conn:
+            cur = conn.execute("DELETE FROM schools WHERE id = ?", (school_id,))
+            return cur.rowcount > 0
+
+    def find_by_name_address(self, name: str, address: str) -> Optional[sqlite3.Row]:
+        with self.read() as conn:
+            return conn.execute(
+                "SELECT * FROM schools WHERE lower(name) = lower(?) AND lower(address) = lower(?)",
+                (name, address),
+            ).fetchone()
+
+    def ping(self) -> bool:
+        try:
+            with self.read() as conn:
+                conn.execute("SELECT 1").fetchone()
+            return True
+        except sqlite3.Error:
+            return False
+
+
+_db: Optional[Database] = None
+
+
+def get_db() -> Database:
+    global _db
+    if _db is None:
+        _db = Database()
+    return _db
+
+
+def reset_db_for_tests(settings: Settings) -> Database:
+    global _db
+    _db = Database(settings)
+    return _db

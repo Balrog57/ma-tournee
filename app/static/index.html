@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ma Tournée — L'Evasion</title>
+  <link rel="icon" href="/static/img/logo-ma-tournee.png" type="image/png">
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img class="brand-logo" src="/static/img/logo-ma-tournee.png" alt="Ma Tournée" width="48" height="48">
+      <div class="brand-text">
+        <strong>L'Evasion</strong>
+        <span>Ma Tournée — écoles</span>
+        <a class="site-link" href="https://evasion57.fr/" target="_blank" rel="noopener noreferrer">evasion57.fr</a>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <div id="status-bar" class="status-bar" aria-live="polite"></div>
+      <button type="button" id="btn-logout" class="btn ghost">Déconnexion</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel list-panel">
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Rechercher une école…" autocomplete="off">
+        <button type="button" id="btn-select-visible" class="btn ghost">Tout visible</button>
+        <button type="button" id="btn-clear-selection" class="btn ghost">Aucun</button>
+      </div>
+
+      <div class="actions-row">
+        <button type="button" id="btn-new" class="btn">Ajouter</button>
+        <label class="btn ghost file-btn">Importer CSV
+          <input type="file" id="import-file" accept=".csv,text/csv" hidden>
+        </label>
+        <a class="btn ghost" id="btn-export" href="/api/export/schools.csv">Exporter</a>
+      </div>
+
+      <div id="school-list" class="school-list" role="list"></div>
+
+      <div class="tour-box">
+        <label class="check">
+          <input type="checkbox" id="round-trip" checked>
+          Retour au dépôt
+        </label>
+        <button type="button" id="btn-optimize" class="btn primary">Calculer la tournée</button>
+      </div>
+
+      <details class="depot-box">
+        <summary>Dépôt — L'Evasion</summary>
+        <form id="depot-form" class="form">
+          <label>Nom <input name="name" required maxlength="200"></label>
+          <label>Adresse <input name="address" required maxlength="500"></label>
+          <div class="row">
+            <label>Lat <input name="lat" type="number" step="any"></label>
+            <label>Lon <input name="lon" type="number" step="any"></label>
+          </div>
+          <div class="actions-row">
+            <button type="submit" class="btn">Enregistrer</button>
+            <button type="button" id="btn-geocode-depot" class="btn ghost">Géocoder</button>
+          </div>
+          <p id="depot-status" class="hint"></p>
+        </form>
+      </details>
+    </section>
+
+    <section class="panel map-panel">
+      <div id="map" aria-label="Carte des écoles"></div>
+      <aside id="tour-panel" class="tour-panel hidden">
+        <h2>Ordre de passage</h2>
+        <p id="tour-summary" class="hint"></p>
+        <ol id="tour-stops"></ol>
+        <p id="tour-warnings" class="warn"></p>
+      </aside>
+    </section>
+  </main>
+
+  <dialog id="school-dialog">
+    <form id="school-form" method="dialog" class="form">
+      <h2 id="dialog-title">École</h2>
+      <input type="hidden" name="id">
+      <label>Nom <input name="name" required maxlength="200"></label>
+      <label>Adresse <input name="address" required maxlength="500"></label>
+      <label>Téléphone <input name="phone" maxlength="40"></label>
+      <div class="row">
+        <label>Lat <input name="lat" type="number" step="any" placeholder="auto"></label>
+        <label>Lon <input name="lon" type="number" step="any" placeholder="auto"></label>
+      </div>
+      <p class="hint">Laissez lat/lon vides pour géocoder l'adresse. Saisissez-les manuellement si l'adresse est introuvable.</p>
+      <div class="actions-row">
+        <button type="submit" class="btn primary" value="save">Enregistrer</button>
+        <button type="button" id="btn-dialog-cancel" class="btn ghost">Annuler</button>
+        <button type="button" id="btn-dialog-delete" class="btn danger hidden">Supprimer</button>
+      </div>
+      <p id="dialog-error" class="warn"></p>
+    </form>
+  </dialog>
+
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script src="/static/js/map.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
