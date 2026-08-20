@@ -160,10 +160,6 @@
 
   function selectSchoolFromMap(schoolId) {
     setListCollapsed(false);
-    state.selected.add(schoolId);
-    renderList();
-    refreshMap();
-    updateSelectionCount();
     requestAnimationFrame(function () {
       const row = els.list.querySelector('[data-school-id="' + schoolId + '"]');
       if (!row) return;
