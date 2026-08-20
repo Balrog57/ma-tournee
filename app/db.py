@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+import unicodedata
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Optional
@@ -12,6 +13,15 @@ from app.models import utc_now_iso
 from app.services.city import extract_city
 
 _write_lock = threading.Lock()
+
+
+def _search_key(value: str) -> str:
+    value = value.translate(str.maketrans({"œ": "oe", "Œ": "oe", "æ": "ae", "Æ": "ae"}))
+    return "".join(
+        char
+        for char in unicodedata.normalize("NFKD", value).casefold()
+        if not unicodedata.combining(char)
+    )
 
 
 class Database:
@@ -140,16 +150,17 @@ class Database:
         order = "favorite DESC, city COLLATE NOCASE, name COLLATE NOCASE"
         with self.read() as conn:
             if q:
-                like = f"%{q.strip()}%"
-                return conn.execute(
-                    f"""
-                    SELECT * FROM schools
-                    WHERE name LIKE ? OR address LIKE ? OR IFNULL(phone, '') LIKE ?
-                       OR IFNULL(city, '') LIKE ?
-                    ORDER BY {order}
-                    """,
-                    (like, like, like, like),
-                ).fetchall()
+                needle = _search_key(q)
+                rows = conn.execute(f"SELECT * FROM schools ORDER BY {order}").fetchall()
+                # ponytail: linear scan keeps accent matching in stdlib; upgrade to a folded search column if the dataset grows large.
+                return [
+                    row
+                    for row in rows
+                    if any(
+                        needle in _search_key(row[field] or "")
+                        for field in ("name", "address", "phone", "city")
+                    )
+                ]
             return conn.execute(f"SELECT * FROM schools ORDER BY {order}").fetchall()
 
     def get_school(self, school_id: int) -> Optional[sqlite3.Row]:

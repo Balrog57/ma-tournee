@@ -137,16 +137,25 @@
   }
 
   function visibleSchools() {
-    const q = (els.search.value || "").trim().toLowerCase();
+    const q = normalizeSearch(els.search.value);
     if (!q) return state.schools.slice();
     return state.schools.filter(function (s) {
       return (
-        (s.name || "").toLowerCase().indexOf(q) !== -1 ||
-        (s.address || "").toLowerCase().indexOf(q) !== -1 ||
-        (s.city || "").toLowerCase().indexOf(q) !== -1 ||
-        (s.phone || "").toLowerCase().indexOf(q) !== -1
+        normalizeSearch(s.name).indexOf(q) !== -1 ||
+        normalizeSearch(s.address).indexOf(q) !== -1 ||
+        normalizeSearch(s.city).indexOf(q) !== -1 ||
+        normalizeSearch(s.phone).indexOf(q) !== -1
       );
     });
+  }
+
+  function normalizeSearch(value) {
+    return String(value || "")
+      .replace(/[œŒ]/g, "oe")
+      .replace(/[æÆ]/g, "ae")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("fr-FR");
   }
 
   function setListCollapsed(collapsed) {

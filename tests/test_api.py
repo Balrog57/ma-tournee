@@ -86,6 +86,10 @@ def test_crud_school(client: TestClient):
     assert listed.status_code == 200
     assert len(listed.json()) == 1
 
+    accent_free_search = client.get("/api/schools?q=ecole")
+    assert accent_free_search.status_code == 200
+    assert len(accent_free_search.json()) == 1
+
     updated = client.put(
         f"/api/schools/{school['id']}",
         json={"name": "École Test 2", "lat": 49.31, "lon": 6.56},
