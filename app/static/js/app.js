@@ -118,13 +118,16 @@
     const el = document.getElementById("selection-count");
     if (!el) return;
     const n = state.selected.size;
-    el.textContent =
+    const num = el.querySelector(".count-num");
+    if (num) num.textContent = String(n);
+    else el.textContent = "Sélec. " + n;
+    el.classList.toggle("has-selection", n > 0);
+    el.title =
       n === 0
         ? "Aucune école sélectionnée pour la tournée"
         : n === 1
           ? "1 école sélectionnée pour la tournée"
           : n + " écoles sélectionnées pour la tournée";
-    el.classList.toggle("has-selection", n > 0);
   }
 
   function visibleSchools() {

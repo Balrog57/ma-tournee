@@ -11,10 +11,12 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <img class="brand-logo" src="/static/img/logo-ma-tournee.png" alt="L'Evasion" width="72" height="72">
+      <img class="brand-logo" src="/static/img/logo-ma-tournee.png" alt="Ma Tournée">
       <div class="brand-text">
-        <strong>L'Evasion</strong>
-        <span class="brand-tagline">Librairie — papeterie — cadeaux</span>
+        <div class="brand-title-row">
+          <strong>L'Evasion</strong>
+          <span class="brand-tagline">Librairie — papeterie — cadeaux</span>
+        </div>
         <span class="brand-address">24, rue de la République, 57320 Bouzonville</span>
         <div class="brand-contacts">
           <button type="button" class="copy-phone" id="btn-copy-phone" data-phone="03 87 57 96 50" title="Cliquer pour copier le numéro">
@@ -34,12 +36,12 @@
     <section class="panel list-panel">
       <div class="list-controls">
         <input type="search" id="search" placeholder="Rechercher une école ou une ville…" autocomplete="off">
-        <div class="selection-row">
-          <button type="button" id="btn-select-visible" class="btn ghost">Tout visible</button>
+        <div class="controls-grid">
+          <button type="button" id="btn-select-visible" class="btn ghost">Tout</button>
           <button type="button" id="btn-clear-selection" class="btn ghost">Aucun</button>
-          <p id="selection-count" class="selection-count hint">Aucune école sélectionnée</p>
-        </div>
-        <div class="actions-row">
+          <button type="button" id="selection-count" class="btn ghost count-btn" disabled title="Écoles sélectionnées pour la tournée">
+            Sélec. <span class="count-num">0</span>
+          </button>
           <button type="button" id="btn-new" class="btn primary">Ajouter</button>
           <label class="btn ghost file-btn">Importer
             <input type="file" id="import-file" accept=".csv,text/csv" hidden>

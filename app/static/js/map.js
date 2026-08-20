@@ -15,6 +15,25 @@ window.TourMap = (function () {
     'fill="#d4a017" stroke="#4a121c" stroke-width="1.4" stroke-linejoin="round"/>' +
     "</svg>";
 
+  const HOUSE_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">' +
+    '<path d="M16 3 L29 14 L25 14 L25 28 L7 28 L7 14 L3 14 Z" ' +
+    'fill="#6e1d2c" stroke="#2e0a12" stroke-width="1.6" stroke-linejoin="round"/>' +
+    '<rect x="13" y="19" width="6" height="9" fill="#f7ebea" stroke="#2e0a12" stroke-width="1"/>' +
+    '<rect x="9.5" y="16" width="4" height="4" fill="#f7ebea" stroke="#2e0a12" stroke-width="0.9"/>' +
+    '<rect x="18.5" y="16" width="4" height="4" fill="#f7ebea" stroke="#2e0a12" stroke-width="0.9"/>' +
+    "</svg>";
+
+  function depotIcon() {
+    return L.divIcon({
+      className: "depot-marker-house",
+      html: HOUSE_SVG,
+      iconSize: [30, 30],
+      iconAnchor: [15, 28],
+      popupAnchor: [0, -26],
+    });
+  }
+
   function init(config, options) {
     options = options || {};
     onSchoolClick = options.onSchoolClick || null;
@@ -76,12 +95,11 @@ window.TourMap = (function () {
       depotMarker = null;
     }
     if (depot && depot.lat != null && depot.lon != null) {
-      depotMarker = L.circleMarker([depot.lat, depot.lon], {
-        radius: 11,
-        color: "#2e0a12",
-        fillColor: "#6e1d2c",
-        fillOpacity: 1,
-        weight: 3,
+      depotMarker = L.marker([depot.lat, depot.lon], {
+        icon: depotIcon(),
+        zIndexOffset: 600,
+        riseOnHover: true,
+        title: depot.name || "Dépôt",
       })
         .bindPopup(
           "<strong>" +

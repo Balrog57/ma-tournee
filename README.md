@@ -1,24 +1,24 @@
-# Ma Tournée — L'Evasion
+# Ma Tournée
 
 Application web légère de planification de tournées pour livraisons scolaires.
-Conçue pour ZimaOS (Docker), utilisable depuis plusieurs PC Windows sur le réseau local.
+Conçue pour un hébergement Docker (ex. NAS / ZimaOS), utilisable depuis plusieurs PC Windows sur le réseau local.
 
-**Dépôt par défaut :** L'Evasion — 24 rue de la République, 57320 Bouzonville  
-**Zone carto :** Lorraine + Sarre (département 57 + école française de Sarrebruck)
+**Dépôt par défaut :** configurable via `.env` (`DEPOT_NAME` / `DEPOT_ADDRESS`)  
+**Zone carto :** région configurable (extrait OSM + Nominatim / OSRM locaux)
 
 ## Fonctionnalités
 
-- Carnet d'écoles partagé (ajout, modification, suppression, recherche, multi-sélection)
+- Carnet d'écoles partagé (ajout, modification, suppression, recherche, multi-sélection, favoris)
 - Import / export CSV compatible Excel (séparateur `;`, UTF-8 BOM)
-- Carte interactive (Leaflet), géocodage via Nominatim local
-- Tournée optimisée (OSRM local + algorithme 2-opt), tracé, distance et temps
+- Carte interactive (Leaflet), géocodage via Nominatim
+- Tournée optimisée (OSRM + algorithme 2-opt), tracé, distance et temps
 - Cache des coordonnées, mode dégradé si OSRM/Nominatim sont indisponibles
-- Auth HTTP Basic optionnelle
+- Page de connexion par session (cookie) si auth activée
 
 ## Prérequis
 
-- Docker et Docker Compose sur ZimaOS (ou Linux)
-- Espace disque pour les données OSM (Lorraine + Sarre : plusieurs Go)
+- Docker et Docker Compose
+- Espace disque pour les données OSM (plusieurs Go selon la zone)
 - RAM recommandée pour la préparation OSRM / import Nominatim : 4 Go ou plus
 
 ## Installation rapide
@@ -26,6 +26,7 @@ Conçue pour ZimaOS (Docker), utilisable depuis plusieurs PC Windows sur le rés
 ```bash
 cd ma-tournee   # dossier du projet
 cp .env.example .env
+# Renseignez AUTH_USER / AUTH_PASSWORD et le dépôt dans .env
 
 # 1) Préparer les données cartographiques (une seule fois, long)
 chmod +x scripts/prepare-osm.sh
@@ -35,15 +36,16 @@ chmod +x scripts/prepare-osm.sh
 docker compose up -d --build
 ```
 
-Accès local sur le NAS : [http://127.0.0.1:8080](http://127.0.0.1:8080)
+Accès local : [http://127.0.0.1:8080](http://127.0.0.1:8080) (ou le port défini dans `.env`)
 
 ## Accès
 
-1. Ouvrez [http://IP-ZIMA:8088](http://IP-ZIMA:8088) (ex. `http://192.168.1.98:8088`)
+1. Ouvrez `http://IP-DU-SERVEUR:PORT` (port publié dans `.env`, souvent `8080` ou `8088`)
 2. Page de connexion : compte / mot de passe configurés dans `.env` (`AUTH_USER` / `AUTH_PASSWORD`)
 3. L’interface est utilisable sur PC et téléphone
 
 Pour désactiver l’auth : laissez `AUTH_USER` et `AUTH_PASSWORD` vides.
+
 ## Commandes utiles
 
 ```bash
@@ -74,13 +76,13 @@ docker compose stop
 | `AUTH_USER` / `AUTH_PASSWORD` | Active la page de connexion si les deux sont renseignés |
 | `GEOCODER_URL` | Nominatim (défaut service Docker interne) |
 | `ROUTER_URL` | OSRM (défaut service Docker interne) |
-| `DEPOT_NAME` / `DEPOT_ADDRESS` | Dépôt initial L'Evasion |
-| `MAP_CENTER_LAT` / `MAP_CENTER_LON` | Centre carte (Bouzonville) |
+| `DEPOT_NAME` / `DEPOT_ADDRESS` | Dépôt initial (nom et adresse) |
+| `MAP_CENTER_LAT` / `MAP_CENTER_LON` | Centre carte |
 | `TILE_URL` | Fond de carte (tuiles OSM par défaut) |
 | `AVG_SPEED_KMH` | Vitesse pour estimation si OSRM down |
 | `MAX_IMPORT_BYTES` | Taille max d'un import CSV |
 
-Les secrets d'auth ne sont **jamais** exposés au frontend.
+Les secrets d'auth ne sont **jamais** exposés au frontend. Ne committez pas votre fichier `.env`.
 
 ## Données persistantes
 
@@ -122,10 +124,9 @@ Ne supprimez pas les dossiers `data/`, `osm-data/`, `nominatim-data/`.
 
 ## Premier import d'écoles
 
-Un fichier d'exemple est fourni : [`examples/ecoles.csv`](examples/ecoles.csv)  
-(inclut l'École française de Sarrebruck et Dillingen).
+Un fichier d'exemple est fourni : [`examples/ecoles.csv`](examples/ecoles.csv)
 
-Dans l'interface : **Importer CSV**.
+Dans l'interface : **Importer**.
 
 Colonnes attendues : `nom;adresse;telephone;lat;lon`  
 (`telephone`, `lat`, `lon` optionnels).
@@ -134,7 +135,7 @@ Colonnes attendues : `nom;adresse;telephone;lat;lon`
 
 - **app** : FastAPI + SQLite + interface HTML/JS
 - **osrm** : calcul d'itinéraires / matrice de distances
-- **nominatim** : géocodage d'adresses FR + DE
+- **nominatim** : géocodage d'adresses
 
 Si OSRM ou Nominatim sont down, l'application reste utilisable (carnet, coords déjà connues, tournée en distances à vol d'oiseau).
 
@@ -162,14 +163,13 @@ uvicorn app.main:app --host 127.0.0.1 --port 8080
 
 Puis ouvrez [http://127.0.0.1:8080](http://127.0.0.1:8080) — `/health` doit répondre avec `"database": true` (géocodeur/routeur en dégradé tant que Nominatim/OSRM ne tournent pas).
 
-Sur ZimaOS, après `./scripts/prepare-osm.sh` et `docker compose up -d --build`, les trois services doivent être up et `/health` passer progressivement à OK.
 ## Sécurité
 
 - Validation Pydantic des entrées
 - Import CSV limité en taille
 - Écritures SQLite sérialisées (`BEGIN IMMEDIATE` + verrou)
 - Échappement HTML côté interface
-- Auth Basic optionnelle sur le LAN
+- Auth optionnelle sur le LAN
 
 ## Limites
 
