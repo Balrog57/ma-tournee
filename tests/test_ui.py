@@ -13,6 +13,7 @@ def test_mobile_list_toggle_and_map_selection_are_wired():
     assert ".layout.list-collapsed" in css
     assert ".list-controls {\n    position: static;" in css
     assert "safe-area-inset-bottom" in css
+    assert ".leaflet-control-zoom" in css
     assert "normalizeSearch" in js
     load_schools = js[js.index("async function loadSchools"):js.index("async function loadHealth")]
     assert "if (!q)" in load_schools

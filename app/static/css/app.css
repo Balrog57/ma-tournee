@@ -703,7 +703,7 @@ dialog::backdrop { background: rgba(40, 16, 22, 0.4); }
   .list-panel {
     border-right: none;
     border-bottom: 1px solid var(--line);
-    overflow: hidden;
+    overflow-y: auto;
   }
 
   .list-controls {
@@ -724,6 +724,10 @@ dialog::backdrop { background: rgba(40, 16, 22, 0.4); }
   #map {
     min-height: 180px;
     height: 100%;
+  }
+
+  .leaflet-control-zoom {
+    display: none !important;
   }
 
   .tour-panel {
